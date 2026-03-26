@@ -254,22 +254,29 @@ However, this is not recommended since sprint names vary. Manual execution is be
 3. View sprint report
 4. Manually count completed + Review items
 5. Manually type into Google Doc
-6. Run sprint-stats.js script separately
-7. Copy/paste results
-8. Calculate running average by hand
+6. Calculate running average by hand
 
 **New Process:**
-1. Click "Sprint Stats > Add Sprint Data"
-2. Type sprint name
-3. Click "Fetch"
-4. Done!
+1. Move unfinished items to next sprint
+2. Close sprint in Jira
+3. Click "Sprint Stats > Add Sprint Data"
+4. Type sprint name
+5. Click "Fetch"
+6. Done!
 
-**Time saved**: ~15-20 minutes per sprint → ~30 seconds
+**Time saved**: ~10 minutes per sprint → ~2 minutes
 
 ## Files
 
 - `Code.gs` - The Apps Script code (paste into Apps Script editor)
 - `README.md` - This file (setup instructions and documentation)
+- `QUICKSTART.md` - 5-minute setup guide
+- `SLACK_SETUP.md` - Slack notification setup guide
+- `CHARTS_AND_ANALYSIS.md` - Guide for creating charts and analyses
+- `SOLUTION_COMPARISON.md` - Comparison of different tracking approaches
+- `FUTURE_ENHANCEMENTS.md` - Ideas for future improvements
+- `CHANGELOG.md` - Release history
+- `LICENSE` - Apache License 2.0
 
 ## Support
 

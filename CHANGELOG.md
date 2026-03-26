@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.1 — Documentation Fixes
+
+- Removed org-specific references (emails, Jira URLs, project keys, sprint names) for public release
+- Genericized custom field comments in Code.gs
+- Made `testJiraConnection()` use configured email instead of hardcoded project key
+- Fixed "Comparison to Previous Workflow" to include sprint close steps in new process
+- Corrected time-saved estimate (~10 min → ~2 min)
+- Added complete file listing to README
+- Added `.gitignore` and `LICENSE` file
+- Added API scope troubleshooting details to README
+
 ## v1.0.0 — Initial Release
 
 ### Features
