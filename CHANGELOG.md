@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.2 — Slack Sprint Report Link
+
+- Slack notification "View in Jira" button now links to the Sprint Report page instead of a JQL issues query, matching the spreadsheet behavior
+
 ## v1.0.1 — Documentation Fixes
 
 - Removed org-specific references (emails, Jira URLs, project keys, sprint names) for public release

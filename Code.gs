@@ -715,7 +715,7 @@ function insertSprintData(sprintName, sprintDetails, devCount, velocity, issueCo
 /**
  * Post sprint statistics to Slack
  */
-function postToSlack(sprintName, velocity, issueCounts, jiraQuery, fiveSprintAvg) {
+function postToSlack(sprintName, velocity, issueCounts, sprintReportUrl, fiveSprintAvg) {
   const config = getJiraConfig();
   const webhookUrl = config.slackWebhook;
 
@@ -801,10 +801,10 @@ function postToSlack(sprintName, velocity, issueCounts, jiraQuery, fiveSprintAvg
           type: 'button',
           text: {
             type: 'plain_text',
-            text: '🔍 View in Jira',
+            text: '🔍 View Sprint Report',
             emoji: true
           },
-          url: jiraQuery,
+          url: sprintReportUrl,
           style: 'primary'
         },
         {
@@ -895,9 +895,6 @@ function fetchAndInsertSprintData(sprintName, devCount) {
       sprintReportUrl = `${config.serverUrl}/issues/?jql=${encodeURIComponent(jql)}`;
     }
 
-    // Also build simple Jira query URL for Slack
-    const jiraQuery = `${config.serverUrl}/issues/?jql=${encodeURIComponent(jql)}`;
-
     // Insert data into spreadsheet
     insertSprintData(
       sprintName,
@@ -919,7 +916,7 @@ function fetchAndInsertSprintData(sprintName, devCount) {
       : null;
 
     // Post to Slack (if configured)
-    postToSlack(sprintName, velocity, issueCounts, jiraQuery, fiveSprintAvg);
+    postToSlack(sprintName, velocity, issueCounts, sprintReportUrl, fiveSprintAvg);
 
     return {
       success: true,
