@@ -482,76 +482,42 @@ function calculateVelocity(issues, enableDebug = false) {
 }
 
 /**
- * Calculate velocity from sprint report data
+ * Sum story points from pre-filtered sprint report issues.
+ * All status-based filtering should be done before calling this function.
  */
-function calculateVelocityFromReport(reportIssues, enableDebug = false) {
-  let velocity = 0;
-  const debugInfo = {
-    closedPoints: 0,
-    reviewStoryBugPoints: 0,
-    reviewTaskPoints: 0,
-    skipped: []
-  };
+function sumStoryPoints(reportIssues, enableDebug = false) {
+  let total = 0;
+
+  if (enableDebug && reportIssues.length > 0) {
+    const sample = reportIssues[0];
+    Logger.log(`Estimate field IDs - currentEstimateStatistic: ${JSON.stringify(sample.currentEstimateStatistic?.statFieldId)}, estimateStatistic: ${JSON.stringify(sample.estimateStatistic?.statFieldId)}`);
+    Logger.log(`Full estimate objects for ${sample.key}: currentEstimateStatistic=${JSON.stringify(sample.currentEstimateStatistic)}, estimateStatistic=${JSON.stringify(sample.estimateStatistic)}`);
+  }
 
   for (const issue of reportIssues) {
-    const status = issue.currentStatus || issue.status?.name;
-    const issueType = issue.typeName || issue.type?.name;
-    const storyPoints = issue.currentEstimateStatistic?.statFieldValue?.value ||
-                        issue.estimateStatistic?.statFieldValue?.value;
+    const currentEst = issue.currentEstimateStatistic?.statFieldValue?.value;
+    const originalEst = issue.estimateStatistic?.statFieldValue?.value;
+    const storyPoints = currentEst ?? originalEst;
 
-    if (!storyPoints || storyPoints === 0) continue;
+    if (!storyPoints) continue;
 
-    // Check if issue is completed (based on sprint report categorization + status)
-    const isComplete = status === 'Closed' || status === 'Done';
-    const isReview = status === 'Review';
+    total += storyPoints;
 
-    // For Story and Bug: count if Closed/Done OR in Review
-    if (issueType === 'Story' || issueType === 'Bug') {
-      if (isComplete) {
-        velocity += storyPoints;
-        if (enableDebug) {
-          debugInfo.closedPoints += storyPoints;
-          Logger.log(`✓ Closed ${issueType}: ${issue.key} (${storyPoints} pts) - Status: ${status}`);
-        }
-      } else if (isReview) {
-        velocity += storyPoints;
-        if (enableDebug) {
-          debugInfo.reviewStoryBugPoints += storyPoints;
-          Logger.log(`✓ Review ${issueType}: ${issue.key} (${storyPoints} pts) - Status: ${status}`);
-        }
-      } else if (enableDebug) {
-        debugInfo.skipped.push(`${issue.key} (${issueType}, ${storyPoints} pts): ${status}`);
-      }
-    } else {
-      // For all other types: only count if Closed/Done
-      if (isComplete) {
-        velocity += storyPoints;
-        if (enableDebug) {
-          debugInfo.closedPoints += storyPoints;
-          Logger.log(`✓ Closed ${issueType}: ${issue.key} (${storyPoints} pts) - Status: ${status}`);
-        }
-      } else if (isReview && enableDebug) {
-        debugInfo.reviewTaskPoints += storyPoints;
-        Logger.log(`✗ Skipped ${issueType} in Review: ${issue.key} (${storyPoints} pts) - Status: ${status}`);
-      } else if (enableDebug) {
-        debugInfo.skipped.push(`${issue.key} (${issueType}, ${storyPoints} pts): ${status}`);
-      }
+    if (enableDebug) {
+      const status = issue.currentStatus || issue.status?.name;
+      const issueType = issue.typeName || issue.type?.name;
+      const estNote = currentEst !== originalEst
+        ? ` [currentEst=${currentEst}, originalEst=${originalEst}]`
+        : '';
+      Logger.log(`✓ ${issueType}: ${issue.key} (${storyPoints} pts) - Status: ${status}${estNote}`);
     }
   }
 
   if (enableDebug) {
-    Logger.log('\n=== VELOCITY CALCULATION SUMMARY ===');
-    Logger.log(`Closed items: ${debugInfo.closedPoints} points`);
-    Logger.log(`Story/Bug in Review: ${debugInfo.reviewStoryBugPoints} points`);
-    Logger.log(`Task in Review (excluded): ${debugInfo.reviewTaskPoints} points`);
-    Logger.log(`Total Velocity: ${velocity} points`);
-    if (debugInfo.skipped.length > 0) {
-      Logger.log(`\nSkipped items (not closed/review):`);
-      debugInfo.skipped.forEach(item => Logger.log(`  - ${item}`));
-    }
+    Logger.log(`\n=== VELOCITY TOTAL: ${total} points ===`);
   }
 
-  return velocity;
+  return total;
 }
 
 /**
@@ -872,15 +838,49 @@ function fetchAndInsertSprintData(sprintName, devCount) {
     // Fetch the sprint report (historical state at sprint close)
     const sprintReport = getSprintReport(sprintDetails.sprintId, sprintDetails.boardId);
 
-    // Combine all issues from sprint report
-    const completedIssues = sprintReport.contents.completedIssues || [];
-    const incompletedIssues = sprintReport.contents.issuesNotCompletedInCurrentSprint || [];
-    const allReportIssues = [...completedIssues, ...incompletedIssues];
+    // Log the sprint report's own summary totals for comparison
+    const reportContents = sprintReport.contents;
+    Logger.log('\n=== SPRINT REPORT SUMMARY (from Jira) ===');
+    Logger.log(`completedIssuesEstimateSum: ${JSON.stringify(reportContents.completedIssuesEstimateSum)}`);
+    Logger.log(`completedIssuesInitialEstimateSum: ${JSON.stringify(reportContents.completedIssuesInitialEstimateSum)}`);
+    Logger.log(`issuesNotCompletedEstimateSum: ${JSON.stringify(reportContents.issuesNotCompletedEstimateSum)}`);
+    Logger.log(`issuesNotCompletedInitialEstimateSum: ${JSON.stringify(reportContents.issuesNotCompletedInitialEstimateSum)}`);
+    Logger.log(`puntedIssuesEstimateSum: ${JSON.stringify(reportContents.puntedIssuesEstimateSum)}`);
+    Logger.log(`puntedIssuesInitialEstimateSum: ${JSON.stringify(reportContents.puntedIssuesInitialEstimateSum)}`);
 
-    Logger.log(`Found ${allReportIssues.length} issues in sprint report (${completedIssues.length} completed, ${incompletedIssues.length} incomplete)`);
+    // Completed issues are all Closed and always count
+    const completedIssues = reportContents.completedIssues || [];
 
-    // Calculate velocity and issue counts (enable debug logging)
-    const velocity = calculateVelocityFromReport(allReportIssues, true);
+    // From incomplete issues, only include Closed/Done (any type) or Review (Stories/Bugs)
+    const allIncomplete = reportContents.issuesNotCompletedInCurrentSprint || [];
+    const qualifyingIncomplete = allIncomplete.filter(issue => {
+      const status = issue.currentStatus || issue.status?.name;
+      const issueType = issue.typeName || issue.type?.name;
+      const isComplete = status === 'Closed' || status === 'Done';
+      const isReviewStoryOrBug = status === 'Review' && (issueType === 'Story' || issueType === 'Bug');
+      return isComplete || isReviewStoryOrBug;
+    });
+
+    // Log filtered-out issues so we can see what was excluded and their points
+    const excludedIncomplete = allIncomplete.filter(issue => !qualifyingIncomplete.includes(issue));
+    if (excludedIncomplete.length > 0) {
+      Logger.log('\n=== EXCLUDED INCOMPLETE ISSUES ===');
+      for (const issue of excludedIncomplete) {
+        const status = issue.currentStatus || issue.status?.name;
+        const issueType = issue.typeName || issue.type?.name;
+        const currentEst = issue.currentEstimateStatistic?.statFieldValue?.value;
+        const originalEst = issue.estimateStatistic?.statFieldValue?.value;
+        Logger.log(`✗ ${issueType}: ${issue.key} - Status: ${status}, currentEst=${currentEst}, originalEst=${originalEst}`);
+      }
+    }
+
+    const allReportIssues = [...completedIssues, ...qualifyingIncomplete];
+
+    Logger.log(`\nFound ${allReportIssues.length} qualifying issues (${completedIssues.length} completed, ${qualifyingIncomplete.length} of ${allIncomplete.length} incomplete)`);
+
+    // Sum velocity directly from the qualified issues
+    Logger.log('\n=== COUNTED ISSUES ===');
+    const velocity = sumStoryPoints(allReportIssues, true);
     const issueCounts = countIssueTypesFromReport(allReportIssues);
 
     // Build Sprint Report URL
